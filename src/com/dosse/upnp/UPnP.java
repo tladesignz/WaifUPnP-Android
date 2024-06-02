@@ -28,7 +28,7 @@ public class UPnP {
 
     private static Gateway defaultGW = null;
     private static final String DEFAULT_APP_NAME = "WaifUPnP";
-    private static final GatewayFinder finder = GatewayFinder() {
+    private static final GatewayFinder finder = new GatewayFinder() {
         @Override
         public void gatewayFound(Gateway g) {
             synchronized (finder) {
