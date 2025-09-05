@@ -18,6 +18,11 @@
  */
 package com.dosse.upnp;
 
+import android.util.Xml;
+
+import org.xmlpull.v1.XmlPullParser;
+
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -25,36 +30,31 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.StringTokenizer;
-import javax.xml.parsers.DocumentBuilderFactory;
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.w3c.dom.traversal.DocumentTraversal;
-import org.w3c.dom.traversal.NodeFilter;
-import org.w3c.dom.traversal.NodeIterator;
 
 /**
- * 
- * @author Federico
+ * Android-friendly UPnP Gateway implementation (no org.w3c.dom.traversal).
  */
 class Gateway {
 
-    private Inet4Address iface;
-    private InetAddress routerip;
+    private final Inet4Address iface;
+    private final InetAddress routerip;
 
     private String serviceType = null, controlURL = null;
 
     public Gateway(byte[] data, Inet4Address ip, InetAddress gatewayip) throws Exception {
         iface = ip;
-        routerip=gatewayip;
+        routerip = gatewayip;
         String location = null;
+
+        // parse SSDP response headers
         StringTokenizer st = new StringTokenizer(new String(data), "\n");
         while (st.hasMoreTokens()) {
             String s = st.nextToken().trim();
             if (s.isEmpty() || s.startsWith("HTTP/1.") || s.startsWith("NOTIFY *")) {
                 continue;
             }
-            String name = s.substring(0, s.indexOf(':')), val = s.length() >= name.length() ? s.substring(name.length() + 1).trim() : null;
+            String name = s.substring(0, s.indexOf(':'));
+            String val = s.length() >= name.length() ? s.substring(name.length() + 1).trim() : null;
             if (name.equalsIgnoreCase("location")) {
                 location = val;
             }
@@ -62,55 +62,86 @@ class Gateway {
         if (location == null) {
             throw new Exception("Unsupported Gateway");
         }
-        Document d;
-        d = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(location);
-        NodeList services = d.getElementsByTagName("service");
-        for (int i = 0; i < services.getLength(); i++) {
-            Node service = services.item(i);
-            NodeList n = service.getChildNodes();
-            String serviceType = null, controlURL = null;
-            for (int j = 0; j < n.getLength(); j++) {
-                Node x = n.item(j);
-                if (x.getNodeName().trim().equalsIgnoreCase("serviceType")) {
-                    serviceType = x.getFirstChild().getNodeValue();
-                } else if (x.getNodeName().trim().equalsIgnoreCase("controlURL")) {
-                    controlURL = x.getFirstChild().getNodeValue();
-                }
-            }
-            if (serviceType == null || controlURL == null) {
-                continue;
-            }
-            if (serviceType.trim().toLowerCase().contains(":wanipconnection:") || serviceType.trim().toLowerCase().contains(":wanpppconnection:")) {
-                this.serviceType = serviceType.trim();
-                this.controlURL = controlURL.trim();
-            }
-        }
+
+        // parse gateway description XML
+        HttpURLConnection conn = (HttpURLConnection) new URL(location).openConnection();
+        InputStream in = conn.getInputStream();
+        parseDescription(in);
+        conn.disconnect();
+
         if (controlURL == null) {
             throw new Exception("Unsupported Gateway");
         }
-        int slash = location.indexOf("/", 7); //finds first slash after http://
+        int slash = location.indexOf("/", 7); // find first slash after http://
         if (slash == -1) {
             throw new Exception("Unsupported Gateway");
         }
-        location = location.substring(0, slash);
+        String base = location.substring(0, slash);
         if (!controlURL.startsWith("/")) {
             controlURL = "/" + controlURL;
         }
-        controlURL = location + controlURL;
+        controlURL = base + controlURL;
+    }
+
+    /** Parse gateway description XML (find serviceType + controlURL). */
+    private void parseDescription(InputStream in) throws Exception {
+        XmlPullParser parser = Xml.newPullParser();
+        parser.setInput(in, null);
+
+        String currentTag = null;
+        String serviceTypeFound = null, controlURLFound = null;
+
+        int eventType = parser.getEventType();
+        while (eventType != XmlPullParser.END_DOCUMENT) {
+            if (eventType == XmlPullParser.START_TAG) {
+                currentTag = parser.getName();
+            } else if (eventType == XmlPullParser.TEXT) {
+                String text = parser.getText().trim();
+                if (currentTag != null && !text.isEmpty()) {
+                    if ("serviceType".equalsIgnoreCase(currentTag)) {
+                        serviceTypeFound = text;
+                    } else if ("controlURL".equalsIgnoreCase(currentTag)) {
+                        controlURLFound = text;
+                    }
+                }
+            } else if (eventType == XmlPullParser.END_TAG) {
+                if ("service".equalsIgnoreCase(parser.getName())) {
+                    if (serviceTypeFound != null && controlURLFound != null) {
+                        if (serviceTypeFound.toLowerCase().contains(":wanipconnection:") ||
+                                serviceTypeFound.toLowerCase().contains(":wanpppconnection:")) {
+                            this.serviceType = serviceTypeFound.trim();
+                            this.controlURL = controlURLFound.trim();
+                            return;
+                        }
+                    }
+                    serviceTypeFound = controlURLFound = null;
+                }
+                currentTag = null;
+            }
+            eventType = parser.next();
+        }
     }
 
     private Map<String, String> command(String action, Map<String, String> params) throws Exception {
         Map<String, String> ret = new HashMap<>();
-        String soap = "<?xml version=\"1.0\"?>\r\n" + "<SOAP-ENV:Envelope xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\" SOAP-ENV:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
-                + "<SOAP-ENV:Body>"
-                + "<m:" + action + " xmlns:m=\"" + serviceType + "\">";
+
+        StringBuilder soap = new StringBuilder();
+        soap.append("<?xml version=\"1.0\"?>")
+                .append("<SOAP-ENV:Envelope xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\" SOAP-ENV:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">")
+                .append("<SOAP-ENV:Body>")
+                .append("<m:").append(action).append(" xmlns:m=\"").append(serviceType).append("\">");
+
         if (params != null) {
             for (Map.Entry<String, String> entry : params.entrySet()) {
-                soap += "<" + entry.getKey() + ">" + entry.getValue() + "</" + entry.getKey() + ">";
+                soap.append("<").append(entry.getKey()).append(">")
+                        .append(entry.getValue())
+                        .append("</").append(entry.getKey()).append(">");
             }
         }
-        soap += "</m:" + action + "></SOAP-ENV:Body></SOAP-ENV:Envelope>";
-        byte[] req = soap.getBytes();
+
+        soap.append("</m:").append(action).append("></SOAP-ENV:Body></SOAP-ENV:Envelope>");
+
+        byte[] req = soap.toString().getBytes();
         HttpURLConnection conn = (HttpURLConnection) new URL(controlURL).openConnection();
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
@@ -119,27 +150,37 @@ class Gateway {
         conn.setRequestProperty("Connection", "Close");
         conn.setRequestProperty("Content-Length", "" + req.length);
         conn.getOutputStream().write(req);
-        Document d = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(conn.getInputStream());
-        NodeIterator iter = ((DocumentTraversal) d).createNodeIterator(d.getDocumentElement(), NodeFilter.SHOW_ELEMENT, null, true);
-        Node n;
-        while ((n = iter.nextNode()) != null) {
-            try {
-                if (n.getFirstChild().getNodeType() == Node.TEXT_NODE) {
-                    ret.put(n.getNodeName(), n.getTextContent());
+
+        // parse SOAP response
+        XmlPullParser parser = Xml.newPullParser();
+        parser.setInput(conn.getInputStream(), null);
+
+        String currentTag = null;
+        int eventType = parser.getEventType();
+        while (eventType != XmlPullParser.END_DOCUMENT) {
+            if (eventType == XmlPullParser.START_TAG) {
+                currentTag = parser.getName();
+            } else if (eventType == XmlPullParser.TEXT) {
+                if (currentTag != null) {
+                    ret.put(currentTag, parser.getText());
                 }
-            } catch (Throwable t) {
+            } else if (eventType == XmlPullParser.END_TAG) {
+                currentTag = null;
             }
+            eventType = parser.next();
         }
+
         conn.disconnect();
         return ret;
     }
 
-    public String getGatewayIP(){ return routerip.getHostAddress(); }
+    public String getGatewayIP() {
+        return routerip.getHostAddress();
+    }
 
     public String getLocalIP() {
         return iface.getHostAddress();
     }
-
 
     public String getExternalIP() {
         try {
@@ -204,7 +245,5 @@ class Gateway {
         } catch (Exception ex) {
             return false;
         }
-
     }
-
 }

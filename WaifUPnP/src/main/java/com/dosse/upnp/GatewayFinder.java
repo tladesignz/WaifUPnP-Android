@@ -18,6 +18,8 @@
  */
 package com.dosse.upnp;
 
+import android.util.Log;
+
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
@@ -46,8 +48,8 @@ abstract class GatewayFinder {
 
     private class GatewayListener extends Thread {
 
-        private Inet4Address ip;
-        private String req;
+        private final Inet4Address ip;
+        private final String req;
 
         public GatewayListener(Inet4Address ip, String req) {
             setName("WaifUPnP - Gateway Listener");
@@ -75,11 +77,14 @@ abstract class GatewayFinder {
                             foundgw=true;
                         }
                     } catch (SocketTimeoutException t) {
+                        Log.d("GatewayFinder", "SocketTimeoutException in loop", t);
                         break;
                     } catch (Throwable t) {
+                        Log.d("GatewayFinder", "Error in loop", t);
                     }
                 }
             } catch (Throwable t) {
+                Log.d("GatewayFinder", "Error outside loop", t);
             }
             if ((!foundgw) && (gw!=null)) { //Pick the last GW if none have an external IP - internet not up yet??
                 gatewayFound(gw);
@@ -87,7 +92,7 @@ abstract class GatewayFinder {
         }
     }
 
-    private LinkedList<GatewayListener> listeners = new LinkedList<>();
+    private final LinkedList<GatewayListener> listeners = new LinkedList<>();
 
     public GatewayFinder() {
         for (Inet4Address ip : getLocalIPs()) {
@@ -131,9 +136,11 @@ abstract class GatewayFinder {
                         }
                     }
                 } catch (Throwable t) {
+                    // Ignored.
                 }
             }
         } catch (Throwable t) {
+            // Ignored.
         }
         return ret.toArray(new Inet4Address[]{});
     }
@@ -142,22 +149,28 @@ abstract class GatewayFinder {
         if (ipAddress == null) {
             return false;
         }
+
         if (ipAddress.equalsIgnoreCase("0.0.0.0")) {
             return false;
         }
+
         if (ipAddress.startsWith("192.168.")) {
             return false;
         }
+
         if (ipAddress.startsWith("10.")) {
             return false;
         }
+
         if (ipAddress.startsWith("172.")) {
             if (ipAddress.substring(4, 7).contains(".")) {
                 return true;
             }
+
             final Integer bNet = Integer.getInteger(ipAddress.substring(4, 6));
-            return bNet < 16 || bNet > 31;
+            return bNet != null && (bNet < 16 || bNet > 31);
         }
+
         return true;
     }
 }
