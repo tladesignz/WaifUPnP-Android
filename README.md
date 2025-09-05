@@ -1,6 +1,6 @@
 # WaifUPnP 
 
-UPnP Port Forwarding for Java couldn't be any easier!
+UPnP Port Forwarding for Android couldn't be any easier!
 
 WaifUPnP is an _extremely_ lightweight Java library that allows you to:
 
@@ -20,18 +20,21 @@ Usage Examples are included.
 
 ## Usage
 
-To compile, import the project in Netbeans.
-Alternatively, download the binaries from http://fdossena.com/?p=waifupnp/index.frag
+This package is available on Maven Central.
 
-Once you have the .jar files:
+In your `build.gradle.kts` file add:
 
-- Import `WaifUPnP.jar` into your application
-- Optionally, import `WaifUPnP-javadoc.jar` if you need JavaDoc
-- `WaifUPnP-sources.jar` contains the source code and should not be imported into your project
+```kotlin
+
+dependencies {
+    implementation("com.netzarchitekten:upnp:1.0.0")
+}
+```
 
 ## Compatibility
 
-Java 6 and newer
+Java 11 and newer.
+Android min API 24.
 
 ## Limitations
 
@@ -41,6 +44,7 @@ While this is enough for most people, if you need a full implementation of UPnP,
 
 ## License
 Copyright (C) 2015-2018 Federico Dossena
+Copyright (C) 2025 Benjamin Erhart
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
