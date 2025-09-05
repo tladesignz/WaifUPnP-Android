@@ -37,7 +37,7 @@ abstract class GatewayFinder {
     private static final String[] SEARCH_MESSAGES;
 
     static {
-        LinkedList<String> m = new LinkedList<String>();
+        LinkedList<String> m = new LinkedList<>();
         for (String type : new String[]{"urn:schemas-upnp-org:device:InternetGatewayDevice:1", "urn:schemas-upnp-org:service:WANIPConnection:1", "urn:schemas-upnp-org:service:WANPPPConnection:1"}) {
             m.add("M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nST: " + type + "\r\nMAN: \"ssdp:discover\"\r\nMX: 2\r\n\r\n");
         }
@@ -70,7 +70,7 @@ abstract class GatewayFinder {
                         s.receive(recv);
                         gw = new Gateway(recv.getData(), ip, recv.getAddress());
                         String extIp= gw.getExternalIP();
-                        if( (extIp!=null) && (!extIp.equalsIgnoreCase("0.0.0.0")) ){ //Exclude gateways without an external IP
+                        if (isPublic(extIp)) { //Exclude gateways without an external IP
                             gatewayFound(gw);
                             foundgw=true;
                         }
@@ -81,13 +81,13 @@ abstract class GatewayFinder {
                 }
             } catch (Throwable t) {
             }
-            if( (!foundgw) && (gw!=null)){ //Pick the last GW if none have an external IP - internet not up yet??
+            if ((!foundgw) && (gw!=null)) { //Pick the last GW if none have an external IP - internet not up yet??
                 gatewayFound(gw);
             }
         }
     }
 
-    private LinkedList<GatewayListener> listeners = new LinkedList<GatewayListener>();
+    private LinkedList<GatewayListener> listeners = new LinkedList<>();
 
     public GatewayFinder() {
         for (Inet4Address ip : getLocalIPs()) {
@@ -111,7 +111,7 @@ abstract class GatewayFinder {
     public abstract void gatewayFound(Gateway g);
 
     private static Inet4Address[] getLocalIPs() {
-        LinkedList<Inet4Address> ret = new LinkedList<Inet4Address>();
+        LinkedList<Inet4Address> ret = new LinkedList<>();
         try {
             Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
             while (ifaces.hasMoreElements()) {
@@ -138,4 +138,26 @@ abstract class GatewayFinder {
         return ret.toArray(new Inet4Address[]{});
     }
 
+    private boolean isPublic(String ipAddress) {
+        if (ipAddress == null) {
+            return false;
+        }
+        if (ipAddress.equalsIgnoreCase("0.0.0.0")) {
+            return false;
+        }
+        if (ipAddress.startsWith("192.168.")) {
+            return false;
+        }
+        if (ipAddress.startsWith("10.")) {
+            return false;
+        }
+        if (ipAddress.startsWith("172.")) {
+            if (ipAddress.substring(4, 7).contains(".")) {
+                return true;
+            }
+            final Integer bNet = Integer.getInteger(ipAddress.substring(4, 6));
+            return bNet < 16 || bNet > 31;
+        }
+        return true;
+    }
 }
