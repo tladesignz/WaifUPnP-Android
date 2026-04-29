@@ -24,8 +24,7 @@ This package is available on Maven Central.
 
 In your `build.gradle.kts` file add:
 
-```kotlin
-
+```kts
 dependencies {
     implementation("com.netzarchitekten:upnp:1.0.0")
 }
@@ -33,7 +32,7 @@ dependencies {
 
 ## Compatibility
 
-Java 11 and newer.
+Java 21 and newer.
 Android min API 24.
 
 ## Limitations

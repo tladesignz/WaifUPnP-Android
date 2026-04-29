@@ -20,4 +20,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "WaifUPnP-Android"
-include ':WaifUPnP'
+include(":WaifUPnP")
