@@ -36,6 +36,9 @@ import java.util.LinkedList;
  */
 abstract class GatewayFinder {
 
+    public static boolean LOG_GATEWAY_FINDER_EXCEPTIONS = false;
+    private static final String TAG = "GatewayFinder";
+
     private static final String[] SEARCH_MESSAGES;
 
     static {
@@ -59,34 +62,37 @@ abstract class GatewayFinder {
 
         @Override
         public void run() {
-            boolean foundgw=false;
-            Gateway gw=null;
+            boolean foundgw = false;
+            Gateway gw = null;
             try {
                 byte[] req = this.req.getBytes();
                 DatagramSocket s = new DatagramSocket(new InetSocketAddress(ip, 0));
                 s.send(new DatagramPacket(req, req.length, new InetSocketAddress("239.255.255.250", 1900)));
                 s.setSoTimeout(3000);
-                for (;;) {
+                for (; ; ) {
                     try {
                         DatagramPacket recv = new DatagramPacket(new byte[1536], 1536);
                         s.receive(recv);
                         gw = new Gateway(recv.getData(), ip, recv.getAddress());
-                        String extIp= gw.getExternalIP();
+                        String extIp = gw.getExternalIP();
                         if (isPublic(extIp)) { //Exclude gateways without an external IP
                             gatewayFound(gw);
-                            foundgw=true;
+                            foundgw = true;
                         }
                     } catch (SocketTimeoutException t) {
-                        Log.d("GatewayFinder", "SocketTimeoutException in loop", t);
+                        if (LOG_GATEWAY_FINDER_EXCEPTIONS)
+                            Log.e(TAG, "SocketTimeoutException in loop", t);
                         break;
                     } catch (Throwable t) {
-                        Log.d("GatewayFinder", "Error in loop", t);
+                        if (LOG_GATEWAY_FINDER_EXCEPTIONS)
+                            Log.e(TAG, "Error in loop", t);
                     }
                 }
             } catch (Throwable t) {
-                Log.d("GatewayFinder", "Error outside loop", t);
+                if (LOG_GATEWAY_FINDER_EXCEPTIONS)
+                    Log.e(TAG, "Error outside loop", t);
             }
-            if ((!foundgw) && (gw!=null)) { //Pick the last GW if none have an external IP - internet not up yet??
+            if ((!foundgw) && (gw != null)) { //Pick the last GW if none have an external IP - internet not up yet??
                 gatewayFound(gw);
             }
         }
