@@ -1,21 +1,22 @@
+import com.android.build.api.dsl.LibraryExtension
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.maven.publish)
 }
 
-android {
+configure<LibraryExtension> {
     namespace = "com.netzarchitekten.upnp"
+    compileSdk {
+        version = release(37)
+    }
 
     defaultConfig {
-        compileSdk {
-            version = release(37)
-        }
         minSdk = 24
-        consumerProguardFiles("consumer-rules.pro")
     }
 
     buildTypes {
-        release {
+        getByName("release") {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -23,6 +24,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_24
         targetCompatibility = JavaVersion.VERSION_24

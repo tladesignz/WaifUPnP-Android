@@ -54,7 +54,7 @@ class Gateway {
                 continue;
             }
             String name = s.substring(0, s.indexOf(':'));
-            String val = s.length() >= name.length() ? s.substring(name.length() + 1).trim() : null;
+            String val = s.substring(name.length() + 1).trim();
             if (name.equalsIgnoreCase("location")) {
                 location = val;
             }
