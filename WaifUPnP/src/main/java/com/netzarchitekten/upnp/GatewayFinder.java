@@ -36,6 +36,7 @@ import java.util.LinkedList;
  */
 abstract class GatewayFinder {
 
+    @SuppressWarnings("CanBeFinal")
     public static boolean LOG_GATEWAY_FINDER_EXCEPTIONS = false;
     private static final String TAG = "GatewayFinder";
 

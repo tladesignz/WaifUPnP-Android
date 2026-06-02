@@ -13,7 +13,8 @@ using literally 1 line of code, as it should be!
 It's as easy as:
 
 ```java
-UPnP.openTCP(<port number here>);
+int port = 1234;
+boolean portOpened = UPnP.openTCP(port);
 ```
 
 Usage Examples are included.
@@ -31,8 +32,6 @@ dependencies {
 ```
 
 ## Compatibility
-
-Java 21 and newer.
 Android min API 24.
 
 ## Limitations
